@@ -11,7 +11,7 @@ from langchain_core.prompts import MessagesPlaceholder, ChatPromptTemplate, \
 from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_qdrant import QdrantVectorStore
-from langfuse import observe, propagate_attributes
+from langfuse import observe, propagate_attributes, get_client
 from langfuse.langchain import CallbackHandler
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import Distance, VectorParams
@@ -191,6 +191,7 @@ def main():
     current_session_id = f"session-{uuid.uuid4().hex[:8]}"
 
     langfuse_handler = CallbackHandler()
+    langfuse_client = get_client()
     # List of available tools
     tools = [smartphone_info_tool]
 
@@ -263,6 +264,17 @@ def main():
                             "callbacks": [langfuse_handler], "metadata": {
                                 "langfuse_session_id": current_session_id,
                                 "langfuse_user_id": current_user_id, }})
+                    feedback = input(
+                        "Was this answer helpful? (Yes/No): ").strip()
+                    user_comment = input(
+                        "Please give us a reason for your answer. This will help us improve: ").strip()
+                    langfuse_client.create_score(
+                        trace_id=langfuse_handler.last_trace_id,
+                        name="usefulness",
+                        value=feedback,
+                        data_type="CATEGORICAL",
+                        comment=user_comment, )
+                    langfuse_client.flush()
                     print(f"System: {goodbye_message.content}")
                     break
 
